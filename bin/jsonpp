@@ -1,0 +1,25 @@
+#!/usr/bin/env ruby
+require 'multi_json'
+
+def main(file_path)
+  case file_path
+  when '-h', '--help'
+    puts "Usage: jsonpp [file]"
+    puts "Pretty-prints the given file or stdin"
+  when '-', nil
+    input = $stdin.read
+  else
+    input = File.read file_path
+  end
+
+  data = MultiJson.decode input
+
+  output = MultiJson.encode(data, :pretty => true)
+
+  puts output
+rescue MultiJson::DecodeError => ex
+  $stderr.puts ex
+  exit 1
+end
+
+main(ARGV[0])
