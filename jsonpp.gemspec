@@ -1,4 +1,4 @@
-spec = Gem::Specification.new do |s|
+Gem::Specification.new do |s|
   s.name = "jsonpp"
   s.version = '1.0'
   s.homepage = 'https://github.com/zimbatm/jsonpp'
