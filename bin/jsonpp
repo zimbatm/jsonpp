@@ -1,6 +1,11 @@
 #!/usr/bin/env ruby
 require 'multi_json'
 
+PAIRS = {
+  :load => [:load, :dump],
+  :decode => [:decode, :encode],
+}
+
 def main(file_path)
   case file_path
   when '-h', '--help'
@@ -12,9 +17,14 @@ def main(file_path)
     input = File.read file_path
   end
 
-  data = MultiJson.decode input
+  if MultiJson.respond_to?(:load)
+    decode, encode = PAIRS[:load]
+  else
+    decode, encode = PAIRS[:decode]
+  end
 
-  output = MultiJson.encode(data, :pretty => true)
+  data = MultiJson.public_send(decode, input)
+  output = MultiJson.public_send(encode, data, :pretty => true)
 
   puts output
 rescue MultiJson::DecodeError => ex
