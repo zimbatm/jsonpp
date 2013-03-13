@@ -1,10 +1,6 @@
 #!/usr/bin/env ruby
-require 'multi_json'
 
-PAIRS = {
-  :load => [:load, :dump],
-  :decode => [:decode, :encode],
-}
+require File.expand_path('../../okjson.rb', __FILE__)
 
 def main(file_path)
   case file_path
@@ -17,17 +13,11 @@ def main(file_path)
     input = File.read file_path
   end
 
-  if MultiJson.respond_to?(:load)
-    decode, encode = PAIRS[:load]
-  else
-    decode, encode = PAIRS[:decode]
-  end
-
-  data = MultiJson.public_send(decode, input)
-  output = MultiJson.public_send(encode, data, :pretty => true)
+  data = OkJson.decode(input)
+  output = OkJson.encode(data)
 
   puts output
-rescue MultiJson::DecodeError => ex
+rescue OkJson::Error, OkJson::Utf8Error => ex
   $stderr.puts ex
   exit 1
 end
