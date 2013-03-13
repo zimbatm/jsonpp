@@ -143,6 +143,7 @@ def main(file_path)
   when '-h', '--help'
     puts "Usage: jsonpp [file]"
     puts "Pretty-prints the given file or stdin"
+    exit
   when '-', nil
     input = $stdin.read
   else
