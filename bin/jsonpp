@@ -1,6 +1,142 @@
 #!/usr/bin/env ruby
 
+require 'prettyprint'
 require File.expand_path('../../okjson.rb', __FILE__)
+
+class IO
+  # Try to guess the console width if any
+  def columns()
+    return ENV['COLUMNS'].to_i if ENV['COLUMNS']
+    ret = [ 0, 0, 0, 0 ].pack("SSSS")
+    # OSX, Linux values for TIOCGWINSZ
+    [0x40087468, 0x5413].each do |syscall|
+      begin
+        ioctl(syscall, ret)
+        return ret.unpack("SSSS")[1]
+      rescue Errno::ENOTTY
+      end
+    end
+    return 80
+  end
+end
+
+# Micro ANSI coloring lib
+module ANSI
+  COLORS = {
+    :red => 31,
+    :green => 32,
+    :yello => 33,
+    :blue => 34,
+    :magenta => 35,
+    :cyan => 36,
+  }
+
+  def use_colors?
+    output.tty?
+  end
+
+  COLORS.each_pair do |name, value|
+    define_method(name) do |str|
+      if use_colors?
+        "\e[#{value}m#{str}\e[0m"
+      else
+        str
+      end
+    end
+  end
+end
+
+# JSON encoder with layout
+class JSONPP < PrettyPrint
+  include ANSI
+
+  TRUE = "true".freeze
+  FALSE = "false".freeze
+  NULL = "null".freeze
+
+  def self.pp(obj, out=$stdout, width=$stdout.columns)
+    q = new(out, width)
+    q.pp obj
+    q.flush
+    out << "\n"
+  end
+
+  def pp(obj)
+    group {
+      valenc(obj)
+    }
+  end
+
+  def valenc(obj)
+    case obj
+    when String
+      strenc(obj)
+    when Numeric
+      numenc(obj)
+    when Hash
+      objenc(obj)
+    when Array
+      arrenc(obj)
+    when true
+      text yellow(TRUE)
+    when false
+      text yellow(FALSE)
+    when nil
+      text yellow(NULL)
+    else
+      raise ArgumentError, "unknown type #{obj.class} for #{obj}"
+    end
+  end
+
+  def strenc(str)
+    text str.inspect
+  end
+
+  def numenc(num)
+    text cyan(num.inspect)
+  end
+
+  def objenc(obj)
+    group(1, red('{'), red('}')) do
+      seplist(obj, nil, :each_pair) do |k, v|
+        group do
+          pp k
+          text ':'
+          group(1) do
+            breakable ''
+            pp v
+          end
+        end
+      end
+    end
+  end
+
+  def arrenc(arr)
+    group(1, green('['), green(']')) do
+      seplist(arr) do |v|
+        pp v
+      end
+    end
+  end
+
+  def comma_breakable
+    text blue(',')
+    breakable
+  end
+
+  def seplist(list, sep=nil, iter_method=:each) # :yield: element
+    sep ||= lambda { comma_breakable }
+    first = true
+    list.__send__(iter_method) {|*v|
+      if first
+        first = false
+      else
+        sep.call
+      end
+      yield(*v)
+    }
+  end
+end
 
 def main(file_path)
   case file_path
@@ -14,9 +150,7 @@ def main(file_path)
   end
 
   data = OkJson.decode(input)
-  output = OkJson.encode(data)
-
-  puts output
+  JSONPP.pp(data)
 rescue OkJson::Error, OkJson::Utf8Error => ex
   $stderr.puts ex
   exit 1
