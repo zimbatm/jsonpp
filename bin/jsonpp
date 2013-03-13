@@ -4,19 +4,27 @@ require 'prettyprint'
 require File.expand_path('../../okjson.rb', __FILE__)
 
 class IO
-  # Try to guess the console width if any
-  def columns()
-    return ENV['COLUMNS'].to_i if ENV['COLUMNS']
+  require 'io/console'
+rescue LoadError
+  # io/console is only available since 1.9.3
+  def winsize()
     ret = [ 0, 0, 0, 0 ].pack("SSSS")
     # OSX, Linux values for TIOCGWINSZ
     [0x40087468, 0x5413].each do |syscall|
       begin
         ioctl(syscall, ret)
-        return ret.unpack("SSSS")[1]
+        return ret.unpack("SSSS")[0..1]
       rescue Errno::ENOTTY
       end
     end
-    return 80
+    nil
+  end
+end
+
+class IO
+  def columns
+    return ENV['COLUMNS'].to_i if ENV['COLUMNS']
+    (winsize[1] rescue nil) || 80
   end
 end
 
