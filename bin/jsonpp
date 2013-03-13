@@ -93,7 +93,7 @@ class JSONPP < PrettyPrint
   end
 
   def numenc(num)
-    text cyan(num.inspect)
+    text magenta(num.inspect)
   end
 
   def objenc(obj)
