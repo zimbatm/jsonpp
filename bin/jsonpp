@@ -105,13 +105,12 @@ class JSONPP < PrettyPrint
   end
 
   def objenc(obj)
-    group(1, red('{'), red('}')) do
+    bgroup(2, red('{'), red('}')) do
       seplist(obj, nil, :each_pair) do |k, v|
         group do
           pp k
-          text ':'
-          group(1) do
-            breakable ''
+          text ': '
+          group(0) do
             pp v
           end
         end
@@ -120,11 +119,23 @@ class JSONPP < PrettyPrint
   end
 
   def arrenc(arr)
-    group(1, green('['), green(']')) do
+    bgroup(2, green('['), green(']')) do
       seplist(arr) do |v|
         pp v
       end
     end
+  end
+
+  def bgroup(indent=0, open_obj='', close_obj='', open_width=open_obj.length, close_width=close_obj.length)
+    text open_obj, open_width
+    group_sub {
+      nest(indent) {
+        breakable ''
+        yield
+      }
+    }
+    breakable ''
+    text close_obj, close_width
   end
 
   def comma_breakable
