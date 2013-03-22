@@ -106,12 +106,12 @@ class JSONPP < PrettyPrint
 
   def objenc(obj)
     bgroup(2, red('{'), red('}')) do
-      seplist(obj, nil, :each_pair) do |k, v|
+      seplist(obj.keys.sort) do |k|
         group do
           pp k
           text ': '
           group(0) do
-            pp v
+            pp obj[k]
           end
         end
       end
