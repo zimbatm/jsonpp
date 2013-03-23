@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name = "jsonpp"
-  s.version = '1.1.0.rc2'
+  s.version = '1.1.0'
   s.homepage = 'https://github.com/zimbatm/jsonpp'
   s.summary = 'Command-line JSON pretty-printer'
   s.description = 'A really small gem that prints your `curl` output nicely'
