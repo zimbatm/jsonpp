@@ -1,33 +1,186 @@
 #!/usr/bin/env ruby
-require 'multi_json'
 
-PAIRS = {
-  :load => [:load, :dump],
-  :decode => [:decode, :encode],
-}
+require 'prettyprint'
+require File.expand_path('../../okjson.rb', __FILE__)
+
+class IO
+  require 'io/console'
+rescue LoadError
+  # io/console is only available since 1.9.3
+  def winsize()
+    ret = [ 0, 0, 0, 0 ].pack("SSSS")
+    # OSX, Linux values for TIOCGWINSZ
+    [0x40087468, 0x5413].each do |syscall|
+      begin
+        ioctl(syscall, ret)
+        return ret.unpack("SSSS")[0..1]
+      rescue Errno::ENOTTY
+      end
+    end
+    nil
+  end
+end
+
+class IO
+  def columns
+    return ENV['COLUMNS'].to_i if ENV['COLUMNS']
+    (winsize[1] rescue nil) || 80
+  end
+end
+
+# Micro ANSI coloring lib
+module ANSI
+  COLORS = {
+    :red => 31,
+    :green => 32,
+    :yellow => 33,
+    :blue => 34,
+    :magenta => 35,
+    :cyan => 36,
+  }
+
+  def use_colors?
+    output.tty?
+  end
+
+  COLORS.each_pair do |name, value|
+    define_method(name) do |str|
+      if use_colors?
+        "\e[#{value}m#{str}\e[0m"
+      else
+        str
+      end
+    end
+  end
+end
+
+# JSON encoder with layout
+class JSONPP < PrettyPrint
+  include ANSI
+
+  TRUE = "true".freeze
+  FALSE = "false".freeze
+  NULL = "null".freeze
+
+  def self.pp(obj, out=$stdout, width=$stdout.columns)
+    q = new(out, width)
+    q.pp obj
+    q.flush
+    out << "\n"
+  end
+
+  def pp(obj)
+    group {
+      valenc(obj)
+    }
+  end
+
+  def valenc(obj)
+    case obj
+    when String
+      strenc(obj)
+    when Numeric
+      numenc(obj)
+    when Hash
+      objenc(obj)
+    when Array
+      arrenc(obj)
+    when true
+      text yellow(TRUE)
+    when false
+      text yellow(FALSE)
+    when nil
+      text yellow(NULL)
+    else
+      raise ArgumentError, "unknown type #{obj.class} for #{obj}"
+    end
+  end
+
+  def strenc(str)
+    text str.inspect
+  end
+
+  def numenc(num)
+    text magenta(num.inspect)
+  end
+
+  def objenc(obj)
+    bgroup(2, red('{'), red('}'), 1, 1) do
+      seplist(obj.keys.sort) do |k|
+        group do
+          pp k
+          text ': '
+          group do
+            pp obj[k]
+          end
+        end
+      end
+    end
+  end
+
+  def arrenc(arr)
+    bgroup(2, green('['), green(']'), 1, 1) do
+      seplist(arr) do |v|
+        pp v
+      end
+    end
+  end
+
+  def text(obj, width=nil)
+    if width.nil?
+      # Remove the ANSI codes
+      nocolor = obj.gsub(/\033\[[0-9;]*m/,'')
+      width = nocolor.length
+    end
+    super(obj, width)
+  end
+
+  def bgroup(indent=0, open_obj='', close_obj='', open_width=open_obj.length, close_width=close_obj.length)
+    text open_obj, open_width
+    group_sub {
+      nest(indent) {
+        breakable ''
+        yield
+      }
+    }
+    breakable ''
+    text close_obj, close_width
+  end
+
+  def comma_breakable
+    text blue(',')
+    breakable
+  end
+
+  def seplist(list, sep=nil, iter_method=:each) # :yield: element
+    sep ||= lambda { comma_breakable }
+    first = true
+    list.__send__(iter_method) {|*v|
+      if first
+        first = false
+      else
+        sep.call
+      end
+      yield(*v)
+    }
+  end
+end
 
 def main(file_path)
   case file_path
   when '-h', '--help'
     puts "Usage: jsonpp [file]"
     puts "Pretty-prints the given file or stdin"
+    exit
   when '-', nil
     input = $stdin.read
   else
     input = File.read file_path
   end
 
-  if MultiJson.respond_to?(:load)
-    decode, encode = PAIRS[:load]
-  else
-    decode, encode = PAIRS[:decode]
-  end
-
-  data = MultiJson.public_send(decode, input)
-  output = MultiJson.public_send(encode, data, :pretty => true)
-
-  puts output
-rescue MultiJson::DecodeError => ex
+  data = OkJson.decode(input)
+  JSONPP.pp(data)
+rescue OkJson::Error, OkJson::Utf8Error => ex
   $stderr.puts ex
   exit 1
 end
