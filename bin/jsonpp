@@ -183,6 +183,7 @@ def main(file_path)
 rescue OkJson::Error, OkJson::Utf8Error => ex
   $stderr.puts ex
   exit 1
+rescue Errno::EPIPE
 end
 
 main(ARGV[0])
